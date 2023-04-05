@@ -7,6 +7,8 @@ library(markerGeneProfile)
 library(tidyr)
 library(ggpubr)
 library(dplyr)
+library(ggplot2)
+library(cowplot)
 
 # Load data
 
@@ -14,7 +16,7 @@ library(dplyr)
 meta <- read_csv("/external/rprshnas01/external_data/rosmap/gene_expression/RNAseq_Harmonization/raw_gene_counts/metadata/RNAseq_Harmonization_ROSMAP_combined_metadata.csv") %>%
   # filter duplicated genes 
   filter(duplicated(specimenID) == FALSE) %>%
-  select(specimenID,
+  dplyr::select(specimenID,
          age_death, 
          msex, 
          pmi, 
@@ -158,57 +160,3 @@ QC_metrics %>%  ggplot(aes(x=celltype, y=percent_variance_PC1))+
   theme(axis.text.x = element_text(angle = 90)) + coord_flip()
 
 
-# Plot marker gene proportions (MGPs) vs. sample age
-# create a vector of cell types to plot 
-plot_genes = c("Exc_IT","Inh_SST","Oligodendrocyte")
-# create a list to store plots generated within the for loop
-plot_list = list()
-
-# loop through vector of genes to plot
-for(i in 1:length(plot_genes)){
-  plot_list[[i]] = ggplot(
-    # subset by cell type 
-    mgp_df %>% filter(cell_type == plot_genes[i]),
-    aes(x = age, y = cell_proportion, color = phenotype)) +
-    geom_smooth(method = "lm", se = F) + 
-    geom_point() +
-    ggtitle(paste(plot_genes[i])) +
-    ylab(paste(plot_genes[i], " MGP")) + xlab ("sample age (years)") +
-    theme_bw() 
-}
-# bring plots together
-plot_grid(plotlist = plot_list, nrow = 1)
-
-
-
-min(estimations_df[,-1])
-
-View(head(estimations))
-
-
-
-
-
-
-
-
-# preview 
-kable(labonte_counts[1:5, 1:10])
-
-sum(duplicated(counts$feature))
-
-
-gsub("\\..*", "", "ENSG00000278267.1")
-
-
-View(head(counts))
-
-
-summary(meta)
-
-# Sample names of samples present in meta but not in counts
-setdiff(meta$specimenID, colnames(counts))
-
-View(head(counts))
-View(meta[duplicated(meta$specimenID),])
-meta$specimenID[254]

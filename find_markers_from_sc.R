@@ -3,7 +3,8 @@ library(Seurat)
 library(patchwork)
 library(MAST)
 library(org.Hs.eg.db)
-library(dplyr)
+library(readr)
+library(tibble)
 
 # Load the single cell meta data and counts
 sc_meta <- read.csv("/external/rprshnas01/netdata_kcni/stlab/Intralab_collab_scc_projects/Isoform_project/Interspecies_comparison/human/metadata.csv")
@@ -14,11 +15,22 @@ sc_intron <- read.csv("/external/rprshnas01/netdata_kcni/stlab/Intralab_collab_s
 sc_meta <- sc_meta[,-1] # Remove first column X in dataframe
 
 table(sc_meta$outlier_call, sc_meta$region_label) # Check for outliers
-new_metadata_filtered <- new_metadata[new_metadata$outlier_call == "False",] # Keep only non-outliers
+sc_meta_filtered <- sc_meta[sc_meta$outlier_call == "False",] # Keep only non-outliers
 
-table(new_metadata_filtered$subclass_label) #Look at sample counts for each subclass
-table(new_metadata_filtered[,c("subclass_label", "region_label")], useNA = "ifany")
-row.names(new_metadata_filtered) <- new_metadata_filtered$sample_name #setting row names to sample names
+table(sc_meta_filtered$subclass_label) #Look at sample counts for each subclass
+table(sc_meta_filtered[,c("subclass_label", "region_label")], useNA = "ifany")
+
+# Load Azimuth cell type proportion predictions
+azimuth <- read_tsv("/external/rprshnas01/kcni/jxia/transcriptome-ref-harmonization/azimuth_pred.tsv") %>%
+  dplyr::rename(azimuth_subclass = predicted.subclass) %>%
+  subset(select = c(cell, azimuth_subclass))
+
+new_meta <- left_join(azimuth, sc_meta_filtered, by = c("cell" = "sample_name"))
+new_meta <- as.data.frame(new_meta)
+rownames(new_meta) <- new_meta$cell #setting row names to sample names
+
+
+
 
 # Combine the exon and intron counts into one dataframe
 sc_sum <- rbind(sc_exon, sc_intron)
@@ -29,18 +41,19 @@ sc_sum <- sc_sum[,-1] # Remove first column X in dataframe
 # saveRDS(sc_allcounts, "~/transcriptome-ref-harmonization/sc_allcounts_raw.rds")
 sc_allcounts_raw <- readRDS("~/transcriptome-ref-harmonization/sc_allcounts_raw.rds")
 sc_allcounts <- column_to_rownames(sc_allcounts_raw, "Group.1") # Set first column as rownames, needed to convert to matrix
-sc_allcounts <- sc_allcounts[,rownames(new_metadata_filtered)] #filter for the cells we specified previously (removing outliers)
-
+sc_allcounts <- sc_allcounts[,new_meta$cell] #filter for the cells we specified previously (removing outliers). may display error because cells in metadata are not in count matrix
+new_meta <- new_meta[colnames(sc_allcounts),]
+#new_meta <- new_meta[,-1] # Remove first column X in dataframe
 
 # Convert dataframe to matrix 
 new_count_matrix <- as.matrix(sc_allcounts, sparse = TRUE) 
 
 
 # Create seurat object from counts and metadata
-humanM1_seuobj <- CreateSeuratObject(counts = new_count_matrix, meta.data = new_metadata_filtered) 
+humanM1_seuobj <- CreateSeuratObject(counts = new_count_matrix, meta.data = new_meta) 
 humanM1_seuobj <- NormalizeData(humanM1_seuobj, normalization.method = "LogNormalize", scale.factor = 1000000)
 
-Idents(humanM1_seuobj) <- "subclass_label" # set active identity
+Idents(humanM1_seuobj) <- "azimuth_subclass" # set active identity
 head(Idents(humanM1_seuobj)) # see our active identities of cells
 
 all_group_markers <- FindAllMarkers(object = humanM1_seuobj, 
@@ -52,10 +65,4 @@ saveRDS(all_group_markers, "~/transcriptome-ref-harmonization/M1_all_group_marke
 
 
 
-sonny_markers <- read_csv(url('https://raw.githubusercontent.com/sonnyc247/MarkerSelection/master/Data/Outputs/CSVs_and_Tables/Markers/MTG_and_CgG_lfct2/new_MTGnCgG_lfct2.5_Publication.csv'))
-marker_data <- readRDS("/external/rprshnas01/kcni/jxia/transcriptome-ref-harmonization/M1_all_group_markers.rds")
 
-annots <- select(org.Hs.eg.db, keys=marker_data$gene, 
-                 columns="SYMBOL", keytype="ENSEMBL")
-# Try again after dplyr is fixed
-result <- left_join(marker_data, annots, by = c("gene"="ENSEMBL"))
