@@ -1,3 +1,5 @@
+# Comparing mgp predicted proportions with ROSMAP sn. 
+
 library(dplyr)
 library(readr)
 library(ggplot2)
