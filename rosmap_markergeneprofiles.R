@@ -150,6 +150,8 @@ QC_metrics %>%  ggplot(aes(x = celltype, y = num_markers)) +
   coord_flip()
 
 
+
+
 # Plot the percent variance explained by PC (principal component) 1
 QC_metrics %>%  ggplot(aes(x=celltype, y=percent_variance_PC1))+
   geom_bar(stat = "identity", fill =ifelse(QC_metrics$percent_variance_PC1 > 0.35, "#AFEEEE", "#808080")) +
@@ -158,5 +160,45 @@ QC_metrics %>%  ggplot(aes(x=celltype, y=percent_variance_PC1))+
        x="MGPs", y = "Percent Variance Explained by PC 1")+
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 90)) + coord_flip()
+
+
+# Run MGP with markers from Micaela's paper
+pub_markers = read.csv(url('https://raw.githubusercontent.com/sonnyc247/MarkerSelection/master/Data/Outputs/CSVs_and_Tables/Markers/MTG_and_CgG_lfct2/new_MTGnCgG_lfct2.5_Publication.csv'))[,-1]
+pub_cell_types = pub_markers$Subclass %>% unique()
+
+# organize markers into a list, which is the format will need for next steps 
+pub_marker_list = lapply(pub_cell_types, function(cell_type){
+  return(pub_markers %>% filter(Subclass == cell_type) %>% pull(Ensembl.gene.ID) %>% unlist())
+})
+names(pub_marker_list) = pub_cell_types # Set names as the cell types
+pub_marker_list <- strsplit(pub_marker_list, ", ")
+# Split ENSG gene codes that are separated by commas
+pub_marker_list_reformatted <- lapply(pub_marker_list, function(sub_list) {
+  unlist(lapply(sub_list, function(string) {
+    strsplit(string, ", ")
+  }))
+})
+# Remove NA values from all sublists using lapply
+pub_marker_list_reformatted <- lapply(pub_marker_list_reformatted, function(sub_list) {
+  unlist(lapply(sub_list, function(x) na.omit(x)))
+})
+
+# Run marker gene profile (MGP) analysis
+pub_estimations =  mgpEstimate(
+  exprData = gene_mat,
+  genes = pub_marker_list,
+  geneColName = 'gene_symbol',
+  outlierSampleRemove = FALSE, # should outlier samples removed. This is done using boxplot stats
+  geneTransform = NULL, # this is the default option for geneTransform
+  groups = NULL, # if there are experimental groups provide them here. if not desired set to NULL
+  seekConsensus = FALSE, # ensures gene rotations are positive in both of the groups
+  removeMinority = TRUE)
+
+
+# get proportion estimates as data frame
+pub_estimations_df = as.data.frame(pub_estimations$estimates) %>%
+  rownames_to_column(var = "specimenID")
+saveRDS(pub_estimations_df, "/external/rprshnas01/kcni/jxia/transcriptome-ref-harmonization/pub_rosmap_mgp_estimations.rds")
+
 
 

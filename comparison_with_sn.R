@@ -1,4 +1,5 @@
 # Comparing mgp predicted proportions with ROSMAP sn. 
+# Both the MGP I generated and from Micaela's paper
 
 library(dplyr)
 library(readr)
@@ -73,4 +74,40 @@ for (i in seq(length(common_subclass))) {
 # Arrange the plots in a 2x2 grid
 grid.arrange(grobs = plot_list)
   
+
+
+
+
+# Plot mgp results generated from markers from Micaela's paper
+pub_rosmap_mgp_estimations <- readRDS("/external/rprshnas01/kcni/jxia/transcriptome-ref-harmonization/pub_rosmap_mgp_estimations.rds") %>%
+  dplyr::rename(Astro = Astrocyte, 
+                Endo = Endothelial, 
+                Pvalb = PVALB, 
+                Vip = VIP, 
+                Sst = SST, 
+                Pax6 = PAX6, 
+                Lamp5 = LAMP5,
+                Micro = Microglia, 
+                Oligo = Oligodendrocyte, 
+                L6.IT.Car3 = L5.6.IT.Car3)
+
+sn_proportions$IT <- apply(sn_proportions[, c("L5.IT", "L6.IT", "L2.3.IT")], 1, sum)
+sn_proportions <- sn_proportions[, !(names(sn_proportions) %in% c("L5.IT", "L6.IT", "L2.3.IT"))]
+
+# Match up column names for sn_proportions & rosmap_mgp_estimations
+setdiff(colnames(sn_proportions), colnames(pub_rosmap_mgp_estimations))
+setdiff(colnames(pub_rosmap_mgp_estimations), colnames(sn_proportions))
+common_subclass <- intersect(colnames(sn_proportions), colnames(pub_rosmap_mgp_estimations))
+common_subclass <- common_subclass[common_subclass != "specimenID"]
+
+
+plot_correlation(sn_proportions, pub_rosmap_mgp_estimations, "pub_mgp")
+
+
+
+
+
+
+
+
 
